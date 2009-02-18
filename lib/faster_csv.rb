@@ -1597,31 +1597,31 @@ class FasterCSV
       #
       current_field = ''
       field_quotes = 0
+      quote_and_newlines = @quote_char + "\r\n"
       parse.split(@col_sep, -1).each do |match|
         current_field << match
-        field_quotes += match.count @quote_char
-        if field_quotes == 0 # we have an unquoted field
-          unless match.count("\r\n").zero?  # verify correctness of field...
-            raise MalformedCSVError, "Unquoted fields do not allow " +
-                                         "\\r or \\n (line #{lineno + 1})."
-          end
-          current_field = nil if current_field.empty? # change empty to nil
-        elsif field_quotes % 2 == 0 # we found a quoted field
-          in_quotes = current_field[@parsers[:quoted_field], 1]
-          raise MalformedCSVError unless in_quotes
-          current_field = in_quotes
-          current_field.gsub! @quote_char * 2, @quote_char # unescape contents
-        elsif current_field[0] != @quote_char[0] # invalid field with quotes
-          raise MalformedCSVError, "Illegal quoting on line #{lineno + 1}."
-        else # we found a quoted field that spans multiple lines
-          current_field << @col_sep
-        end
-        if field_quotes % 2 == 0
-          csv << current_field
+        if match.count(quote_and_newlines).zero?
+          csv << (current_field.empty? ? nil : current_field)
           current_field = ''
-          field_quotes = 0
+        elsif current_field[0] == @quote_char[0]
+          field_quotes += match.count @quote_char
+          if field_quotes % 2 == 0
+            in_quotes = current_field[@parsers[:quoted_field], 1]
+            raise MalformedCSVError unless in_quotes
+            current_field = in_quotes
+            current_field.gsub! @quote_char * 2, @quote_char # unescape contents
+            csv << current_field
+            current_field = ''
+            field_quotes = 0
+          else # we found a quoted field that spans multiple lines
+            current_field << @col_sep
+          end
+        elsif match.count("\r\n").zero?
+          raise MalformedCSVError, "Illegal quoting on line #{lineno + 1}."
+        else
+          raise MalformedCSVError, "Unquoted fields do not allow " +
+                                       "\\r or \\n (line #{lineno + 1})."
         end
-        parse = parse[(match.size + 1)..-1]
       end
 
       # if parse is empty?(), we found all the fields on the line...
@@ -1784,6 +1784,7 @@ class FasterCSV
     esc_row_sep = Regexp.escape(@row_sep)
     esc_quote   = Regexp.escape(@quote_char)
     @parsers = {
+      :any_field      => Regexp.new("[^#{esc_col_sep}]+", Regexp::MULTILINE, @encoding),
       :quoted_field   => Regexp.new("^#{esc_quote}(.*)#{esc_quote}$", Regexp::MULTILINE, @encoding),
       # safer than chomp!()
       :line_end       => Regexp.new("#{esc_row_sep}\\z", nil, @encoding)
