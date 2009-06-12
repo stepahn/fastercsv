@@ -241,6 +241,23 @@ class TestFasterCSVInterface < Test::Unit::TestCase
     end
   end
   
+  def test_disable_write_headers_when_taken_from_first_line
+    File.unlink(@path)
+
+    lines = [['a','b','c'], [1,2,3], [4,5,6]]
+    FasterCSV.open( @path, "w", :headers       => :frist_line,
+                                :write_headers => false,
+                                :col_sep       => "|" ) do |csv|
+      lines.each { |line| csv << line }
+    end
+
+    # test writing fields in the correct order
+    File.open(@path, "r") do |f|
+      assert_equal("1|2|3", f.gets.strip)
+      assert_equal("4|5|6", f.gets.strip)
+    end
+  end
+
   def test_append  # aliased add_row() and puts()
     File.unlink(@path)
     

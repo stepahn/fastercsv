@@ -1453,10 +1453,10 @@ class FasterCSV
           else                      row
           end
 
-    @headers =  row if header_row?
+    was_header_row,@headers = true,row if header_row?
     @lineno  += 1
 
-    @io << row.map(&@quote).join(@col_sep) + @row_sep  # quote and separate
+    @io << row.map(&@quote).join(@col_sep) + @row_sep if (!was_header_row || @write_headers)  # quote and separate
     
     self  # for chaining
   end
